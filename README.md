@@ -1,7 +1,9 @@
 # SimpleWiFi
-Simple WiFi diagnostic tool in Python
+Simple WiFi tool in Python + curses UI
+providing WiFi scan, connect, Soft AP functions
 
-- Environment: Linux
-- Essentials: wpa_supplicant, ifconfig, iwconfig
+- Environment: Linux (tested under Fedora, Ubuntu)
 - Language: Python 3.4
-- sudo privilege required for wpa_cli commands
+- Dependencies: wpa_supplicant, hostap, dhclient(isc-dhcp-client), dnsmasq, ifconfig, iwconfig
+
+* sudo privilege required for wpa_cli/hostapd commands
