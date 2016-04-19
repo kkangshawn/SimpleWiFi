@@ -112,11 +112,31 @@ def main(stdscr):
         stdscr.addstr(0, 18, ": unknown ")
     stdscr.putwin(STATIC.mainWnd)
 
+    ## Check Soft AP is running
     if os.path.exists("/var/run/hostapd.pid"):
         STATIC.isSoftAP = True
     else:
         STATIC.isSoftAP = False
 
+    ## Check NetworkApp status
+    if os.path.exists("/lib/systemd/system/NetworkManager.service"):
+        STATIC.NetworkApp = "NetworkManager"
+    elif os.path.exists("/lib/systemd/system/connman.service"):
+        STATIC.NetworkApp = "connman"
+
+    if len(STATIC.NetworkApp) > 0:
+        try:
+            p = check_output("systemctl status " + STATIC.NetworkApp, shell=True)
+            output = p.decode("utf-8")
+        except subprocess.CalledProcessError as e:
+            output = e.output.decode("utf-8")
+        finally:
+            output = output[output.index("Loaded: ") + 8:]
+            if output.find(".service; enabled;") > 0:
+                if output.find("inactive (dead) since ") > 0:
+                    STATIC.isNetworkApp = True
+
+    ## Menu
     userInput = ""
     while userInput is not '0':
         getiwconfig(stdscr)
@@ -151,11 +171,6 @@ def main(stdscr):
 ############################################################
 
 def stopnetworkapp():
-    if os.path.exists("/lib/systemd/system/NetworkManager.service"):
-        STATIC.NetworkApp = "NetworkManager"
-    elif os.path.exists("/lib/systemd/system/connman.service"):
-        STATIC.NetworkApp = "connman"
-
     try:
         p = check_output("systemctl status " + STATIC.NetworkApp, shell=True)
         output = p.decode("utf-8")
@@ -176,7 +191,7 @@ def softap(stdscr):
 
     ## disable Soft AP in a toggle way
     if STATIC.isSoftAP:
-        stdscr.addstr(3, 3, "Disabling Soft AP...")
+        stdscr.addstr(3, 3, "Disabling Soft AP.")
         stdscr.refresh()
         try:
             f = open("/var/run/hostapd.pid", 'r')
@@ -196,7 +211,11 @@ def softap(stdscr):
                     msgbox("dhd op_mode set fail")
                     return
 
+            stdscr.addstr(3, 21, ".")
+            stdscr.refresh()
             p = check_output("systemctl restart wpa_supplicant", shell=True)
+            stdscr.addstr(3, 22, ".")
+            stdscr.refresh()
         except PermissionError:
             msgbox("Permission denied. Run as root")
         except:
@@ -214,7 +233,6 @@ def softap(stdscr):
     confWnd = curses.newwin(20, curses.COLS - 5, 3, 2)
     confWnd.addstr(0, 0, cfgstr)
     confWnd.refresh()
-    confWnd.getkey()
 
     ## if Broadcom chipset
     if os.path.exists("/sys/module/dhd/"):
@@ -312,6 +330,9 @@ conf-dir=/etc/dnsmasq.d,.rpmnew,.rpmsave,.rpmorig
         err = e.output.decode("utf-8")
         err = err[:err.index('\n')]
         msgbox("CalledProcessError: %s" % err)
+        if STATIC.isNetworkApp:
+            p = check_output("systemctl start " + STATIC.NetworkApp, shell=True)
+            STATIC.isNetworkApp = False
     else:
         STATIC.isSoftAP = True
 
@@ -637,18 +658,29 @@ def getiwconfig(stdscr):
         STATIC.ethName = devstr
 
     ## retrieve AP connection information
-    try:
-        ap_essid = output[output.index("ESSID:") + 7:]
-        ap_essid = ap_essid[:ap_essid.index('"')]
-        ap_mac = output[output.index("Access Point:") + 14:]
-        ap_mac = ap_mac[:ap_mac.index(' ')]
-        if ap_mac == "Not-Associated":
-            infoStr += "{:>13}".format("AP MAC: ") + "Not connected\n"
-        else:
-            infoStr += "{:>13}".format("AP MAC: ") + ap_mac + '\n'
-            infoStr += "{:>13}".format("AP SSID: ") + ap_essid + '\n'
-    except:
-        pass
+    if STATIC.isSoftAP:
+        f = open("/etc/hostapd/hostapd.conf", 'r')
+        str = f.read()
+        SoftAPchannel = str[str.index("channel=") + 8:]
+        SoftAPchannel = SoftAPchannel[:SoftAPchannel.index('\n')]
+        SoftAPband = str[str.index("hw_mode=") + 8:]
+        SoftAPband = SoftAPband[:SoftAPband.index('\n')]
+        f.close()
+        infoStr += "{:>13}".format("AP channel: ") + SoftAPchannel + '\n'
+        infoStr += "{:>13}".format("AP band: ") + "802.11" + SoftAPband + '\n'
+    else:
+        try:
+            ap_essid = output[output.index("ESSID:") + 7:]
+            ap_essid = ap_essid[:ap_essid.index('"')]
+            ap_mac = output[output.index("Access Point:") + 14:]
+            ap_mac = ap_mac[:ap_mac.index(' ')]
+            if ap_mac == "Not-Associated":
+                infoStr += "{:>13}".format("AP MAC: ") + "Not connected\n"
+            else:
+                infoStr += "{:>13}".format("AP MAC: ") + ap_mac + '\n'
+                infoStr += "{:>13}".format("AP SSID: ") + ap_essid + '\n'
+        except:
+            pass
     infoStr += getifconfig(STATIC.deviceName, stdscr)
 
     infoWnd.addstr(0, 0, infoStr)

@@ -1,6 +1,6 @@
 # SimpleWiFi
 Simple WiFi tool in Python + curses UI
-providing WiFi scan, connect, Soft AP functions
+providing WiFi scan, connect, Soft AP functions for all linux base embedded and desktop systems
 
 - Environment: Linux (tested under Fedora, Ubuntu)
 - Language: Python 3.4
