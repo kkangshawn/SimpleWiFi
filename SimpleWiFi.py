@@ -230,6 +230,8 @@ def softap(stdscr):
         return
 
     cfgstr = confighostap(stdscr)
+    if cfgstr is None:
+        return
     confWnd = curses.newwin(20, curses.COLS - 5, 3, 2)
     confWnd.addstr(0, 0, cfgstr)
     confWnd.refresh()
@@ -358,15 +360,23 @@ driver=nl80211
     hostapd_conf += "interface=" + STATIC.deviceName + "\n"
     ssid = ""
     while len(ssid) is 0:
-        ssid = inputwnd(stdscr, "SSID: ", curses.LINES // 2, 5, 1, 20)
+        curses.echo()
+        stdscr.addstr(3, 3, "SSID: ")
+        stdscr.refresh()
+        ssid = stdscr.getstr().decode("utf-8")
+        #ssid = inputwnd(stdscr, "SSID: ", curses.LINES // 2, 5, 1, 20)
         if len(ssid) is 0:
             msgbox("Invalid SSID!")
     hostapd_conf += "ssid=" + ssid + "\n"
     passwd = " "
     while 0 < len(passwd) and len(passwd) < 8:
-        passwd = inputwnd(stdscr, "passphrase: ", curses.LINES // 2, 5, 1, 20)
+        stdscr.addstr(4, 3, "Password: ")
+        stdscr.refresh()
+        passwd = stdscr.getstr().decode("utf-8")
+        #passwd = inputwnd(stdscr, "passphrase: ", curses.LINES // 2, 5, 1, 20)
         if 0 < len(passwd) and len(passwd) < 8:
-            msgbox("Invalid password!")
+            msgbox("Invalid password! Password must be at least 8 characters")
+            stdscr.addstr(4, 1, ' ' * (curses.COLS - 2))
     if len(passwd) is not 0:
         hostapd_conf += """
 wpa=3
@@ -375,14 +385,58 @@ wpa_pairwise=TKIP
 rsn_pairwise=CCMP
 """
         hostapd_conf += "wpa_passphrase=" + passwd + "\n"
-    op_channel = inputwnd(stdscr, "Operating Channel: ", curses.LINES // 2, 5, 1, 5)
+    stdscr.addstr(5, 3, "Operating Channel: ")
+    stdscr.refresh()
+    op_channel = stdscr.getstr().decode("utf-8")
+    #op_channel = inputwnd(stdscr, "Operating Channel: ", curses.LINES // 2, 5, 1, 5)
     if op_channel is '' or op_channel.isdigit() is False:
+        msgbox("Invalid channel! Set to default: 6")
         op_channel = '6'
     hostapd_conf += "channel=" + op_channel + "\n"
     if int(op_channel) > 14:
         hostapd_conf += "hw_mode=a\n"
     else:
         hostapd_conf += "hw_mode=g\n"
+    curses.noecho()
+
+    stdscr.addstr(6, 3, "< > legacy     < > 11n HT")
+    maxpos = 19
+    if int(op_channel) > 14:
+        stdscr.addstr(6, 33, "< > 11ac VHT")
+        maxpos = 34
+    str = "Press LEFT/RIGHT to move cursor, ENTER to select, 'b' to back"
+    stdscr.addstr(curses.LINES - 1, 5, str)
+    stdscr.refresh()
+
+    stdscr.keypad(True)
+    curpos = 4
+    userInput = ''
+    stdscr.move(6, 4)
+    stdscr.refresh()
+
+    while userInput != (10 or 13 or curses.KEY_ENTER):
+        userInput = stdscr.getch()
+        if userInput == curses.KEY_RIGHT:
+            curpos += 15
+        elif userInput == curses.KEY_LEFT:
+            curpos -= 15
+        elif userInput is ord('b'):
+            return
+
+        if curpos < 4:
+            curpos = 4
+        elif curpos > maxpos:
+            curpos = maxpos
+
+        stdscr.move(6, curpos)
+        stdscr.refresh()
+
+    if curpos is 19:
+        ## 11n HT selected
+        hostapd_conf += "ieee80211n=1"
+    elif curpos is 34:
+        ## 11ac VHT selected
+        hostapd_conf += "ieee80211ac=1"
 
     stdscr = clearscr(stdscr)
     stdscr.refresh()
@@ -663,11 +717,17 @@ def getiwconfig(stdscr):
         str = f.read()
         SoftAPchannel = str[str.index("channel=") + 8:]
         SoftAPchannel = SoftAPchannel[:SoftAPchannel.index('\n')]
-        SoftAPband = str[str.index("hw_mode=") + 8:]
-        SoftAPband = SoftAPband[:SoftAPband.index('\n')]
-        f.close()
         infoStr += "{:>13}".format("AP channel: ") + SoftAPchannel + '\n'
+
+        idx = str.find("ieee80211")
+        if idx < 0:
+            SoftAPband = str[str.index("hw_mode=") + 8:]
+            SoftAPband = SoftAPband[:SoftAPband.index('\n')]
+        else:
+            SoftAPband = str[idx + 9:]
+            SoftAPband = SoftAPband[:SoftAPband.index('=')]
         infoStr += "{:>13}".format("AP band: ") + "802.11" + SoftAPband + '\n'
+        f.close()
     else:
         try:
             ap_essid = output[output.index("ESSID:") + 7:]
