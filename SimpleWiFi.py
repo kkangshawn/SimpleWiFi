@@ -256,7 +256,7 @@ def softap(stdscr):
         if f.read() is '1':
             try:
                 p = check_output(
-                        "dhclient " + STATIC.deviceName, stderr=subprocess.STDOUT)
+                        "dhclient " + STATIC.ethName, stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError as e:
                 err = e.output.decode("utf-8")
                 try:
@@ -264,7 +264,7 @@ def softap(stdscr):
                     p = check_output(
                             "dhclient -r", stderr=open(os.devnull, 'w'))
                     p = check_output(
-                            "dhclient " + STATIC.deviceName, stderr=subprocess.STDOUT)
+                            "dhclient " + STATIC.ethName, stderr=subprocess.STDOUT)
                 except:
                     msgbox("ethernet is connected but dhclient failed to receive IP")
                     f.close()
