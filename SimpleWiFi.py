@@ -171,17 +171,23 @@ def main(stdscr):
 ############################################################
 
 def stopnetworkapp():
-    try:
-        p = check_output("systemctl status " + STATIC.NetworkApp, shell=True)
-        output = p.decode("utf-8")
-    except subprocess.CalledProcessError as e:
-        output = e.output.decode("utf-8")
-    finally:
-        output = output[output.index("Active: ") + 8:]
-        if output.startswith("active (running)"):
-            p = check_output("systemctl stop " + STATIC.NetworkApp, shell=True)
-            p = check_output("systemctl restart wpa_supplicant", shell=True)
-            STATIC.isNetworkApp = True
+    if STATIC.NetworkApp is None:
+        try:
+            p = check_output("systemctl stop wpa_supplicant", shell=True)
+            output = p.decode("utf-8")
+        except subprocess.CalledProcessError as e:
+            output = e.output.decode("utf-8")
+    else:
+        try:
+            p = check_output("systemctl status " + STATIC.NetworkApp, shell=True)
+            output = p.decode("utf-8")
+        except subprocess.CalledProcessError as e:
+            output = e.output.decode("utf-8")
+        finally:
+            output = output[output.index("Active: ") + 8:]
+            if output.startswith("active (running)"):
+                p = check_output("systemctl stop " + STATIC.NetworkApp, shell=True)
+                STATIC.isNetworkApp = True
 
 ############################################################
 
@@ -496,7 +502,7 @@ def connectap(stdscr):
     stdscr.move(4, 5)
     stdscr.refresh()
 
-    while userInput != (10 or 13 or curses.KEY_ENTER): 
+    while userInput != (10 or 13 or curses.KEY_ENTER):
         userInput = stdscr.getch()
         if userInput == curses.KEY_DOWN:
             curpos += 1
