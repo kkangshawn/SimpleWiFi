@@ -16,7 +16,9 @@ class STATIC:
     NetworkApp = ""
     isNetworkApp = False
     mainWnd = tempfile.TemporaryFile()
-
+    page = 0
+    maxpage = 0
+    listsize = 0
 
 ###########################################################
 ## curses helper functions
@@ -496,8 +498,9 @@ def connectap(stdscr):
 
     stdscr.keypad(True)
     curpos = 4
-    str = "Press UP/DOWN to move cursor, ENTER to select, 'b' to back"
     userInput = ''
+    stdscr = showaplist(stdscr)
+    str = "Press UP/DOWN to move cursor, ENTER to select, 'b' to back"
     stdscr.addstr(curses.LINES - 1, 5, str)
     stdscr.move(4, 5)
     stdscr.refresh()
@@ -510,11 +513,33 @@ def connectap(stdscr):
             curpos -= 1
         elif userInput is ord('b'):
             return
+        elif (userInput is ord('n')) and (STATIC.page < STATIC.maxpage):
+            STATIC.page += 1
+            stdscr = showaplist(stdscr)
+            str = "Press UP/DOWN to move cursor, ENTER to select, 'b' to back"
+            stdscr.addstr(curses.LINES - 1, 5, str)
+            stdscr.move(4, 5)
+            stdscr.refresh()
+        elif (userInput is ord('p')) and (STATIC.page > 0):
+            STATIC.page -= 1
+            stdscr = showaplist(stdscr)
+            str = "Press UP/DOWN to move cursor, ENTER to select, 'b' to back"
+            stdscr.addstr(curses.LINES - 1, 5, str)
+            stdscr.move(4, 5)
+            stdscr.refresh()
+
+        if STATIC.apList[0] > STATIC.listsize:
+            if (STATIC.page < STATIC.maxpage) or (STATIC.apList[0] % STATIC.listsize == 0):
+                lowerbound = STATIC.listsize
+            else:
+                lowerbound = STATIC.apList[0] % STATIC.listsize
+        else:
+            lowerbound = STATIC.apList[0]
 
         if curpos < 4:
             curpos = 4
-        elif curpos > 4 + STATIC.apList[0] - 1:
-            curpos = 4 + STATIC.apList[0] - 1
+        elif curpos > 3 + lowerbound:
+            curpos = 3 + lowerbound
 
         stdscr.move(curpos, 5)
         stdscr.refresh()
@@ -657,10 +682,6 @@ def wifiscan(stdscr):
         scanlist = output.split('\n')
         STATIC.apList = [0]
 
-        stdscr = clearscr(stdscr)
-        str = "       %-14s\t%4s\t%3s\t%s" % ("SSID", "Freq", "RSSI", "Security")
-        stdscr.addstr(2, 3, str)
-        j = 1
         for i in range(1, len(scanlist) - 1):
             ap = scanlist[i].split('\t')
             if int(ap[2]) < -80:
@@ -673,13 +694,57 @@ def wifiscan(stdscr):
             apset.append(ap[3])     # Security
             STATIC.apList[0] += 1
             STATIC.apList.append(apset)
-
-            str = (" < > %-16s\t%4s\t%3s\t%s"
-                    % (apset[0], apset[1], apset[2], apset[3]))
-            stdscr.addstr(3 + j, 3, str)
-            j += 1
     else:
         msgbox("Scan failed")
+
+    return stdscr
+###########################################################
+
+def showaplist(stdscr):
+    stdscr = clearscr(stdscr)
+
+    str = "       %-14s\t%4s\t%3s\t%s" % ("SSID", "Freq", "RSSI", "Security")
+    stdscr.addstr(2, 3, str)
+    j = 1
+
+    totalAP = STATIC.apList[0]
+    STATIC.listsize = curses.LINES - 7
+    STATIC.maxpage = totalAP // STATIC.listsize
+    if totalAP % STATIC.listsize == 0:
+        STATIC.maxpage -= 1
+
+    if totalAP > STATIC.listsize:
+        if (STATIC.page < STATIC.maxpage) or (totalAP % STATIC.listsize == 0):
+            for i in range(1, STATIC.listsize + 1):
+                str = (" < > %-16s\t%4s\t%3s\t%s"
+                        % (STATIC.apList[STATIC.page * STATIC.listsize + i][0],
+                            STATIC.apList[STATIC.page * STATIC.listsize + i][1],
+                            STATIC.apList[STATIC.page * STATIC.listsize + i][2],
+                            STATIC.apList[STATIC.page * STATIC.listsize + i][3]))
+                stdscr.addstr(3 + j, 3, str)
+                j += 1
+        else:
+            for i in range(1, totalAP % STATIC.listsize + 1):
+                str = (" < > %-16s\t%4s\t%3s\t%s"
+                        % (STATIC.apList[STATIC.page * STATIC.listsize + i][0],
+                            STATIC.apList[STATIC.page * STATIC.listsize + i][1],
+                            STATIC.apList[STATIC.page * STATIC.listsize + i][2],
+                            STATIC.apList[STATIC.page * STATIC.listsize + i][3]))
+                stdscr.addstr(3 + j, 3, str)
+                j += 1
+        stdscr.addstr(curses.LINES - 2, 7,
+                "Total %d AP found. %d/%d page"
+                % (totalAP, STATIC.page, STATIC.maxpage))
+        stdscr.addstr(3 + j, 5,
+                "* There is more access points. "
+                "Press 'n' for next, 'p' for previous")
+
+    else:
+        for i in range(1, totalAP + 1):
+            str = (" < > %-16s\t%4s\t%3s\t%s"
+                    % (STATIC.apList[i][0], STATIC.apList[i][1], STATIC.apList[i][2], STATIC.apList[i][3]))
+            stdscr.addstr(3 + j, 3, str)
+            j += 1
 
     return stdscr
 
